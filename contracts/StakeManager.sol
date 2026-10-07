@@ -223,9 +223,15 @@ contract StakeManager is StakeMath, EpochMath, TrustedCodehashAccess, IStakeMana
         (uint256 mpRate,, uint256 epochTarget1, uint256 epochTarget2, uint256 mpRemainder) =
             _calculateMPPrediction(account.balance, account.startEpoch, ACCURE_RATE);
 
+        // Only decrement expiredMP if the epoch has been reached
+        // Skip decrementing when epoch hasn't been finalized yet (issue #128)
         if (mpRemainder > 0) {
-            expiredStakeStorage.decrementExpiredMP(epochTarget1, mpRemainder);
-            expiredStakeStorage.decrementExpiredMP(epochTarget2, mpRate - mpRemainder);
+            if (epochTarget1 >= currentEpoch) {
+                expiredStakeStorage.decrementExpiredMP(epochTarget1, mpRemainder);
+            }
+            if (epochTarget2 >= currentEpoch) {
+                expiredStakeStorage.decrementExpiredMP(epochTarget2, mpRate - mpRemainder);
+            }
 
             if (epochTarget1 < currentEpoch) {
                 totalMPRate -= mpRemainder;
@@ -235,7 +241,9 @@ contract StakeManager is StakeMath, EpochMath, TrustedCodehashAccess, IStakeMana
                 totalMPRate -= mpRate - mpRemainder;
             }
         } else {
-            expiredStakeStorage.decrementExpiredMP(epochTarget1, mpRate);
+            if (epochTarget1 >= currentEpoch) {
+                expiredStakeStorage.decrementExpiredMP(epochTarget1, mpRate);
+            }
             if (epochTarget1 < currentEpoch) {
                 totalMPRate -= mpRate;
             }
@@ -256,7 +264,9 @@ contract StakeManager is StakeMath, EpochMath, TrustedCodehashAccess, IStakeMana
                     expiredStakeStorage.incrementExpiredMP(epochTarget2, mpRate - mpRemainder);
                 }
             } else {
-                expiredStakeStorage.incrementExpiredMP(epochTarget1, mpRate);
+                if (currentEpoch >= epochTarget1) {
+                    expiredStakeStorage.incrementExpiredMP(epochTarget1, mpRate);
+                }
             }
             totalMPRate += Math.min(mpRate, account.maxMP - account.totalMP);
         }
